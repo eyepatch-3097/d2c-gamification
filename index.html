@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dotswitch • Mini‑Games</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body{color:white;font-family:'Poppins',Helvetica,Arial,sans-serif;}
+    section{padding:1rem;border-radius:16px;margin:1.5rem;}
+    #game1{background-color:#b34700;}
+    #game2{background-color:#001f3f;}
+    #game3{background-color:#b34700;}
+    .next-btn{position:absolute;top:10px;right:10px;}
+    canvas,img{max-width:100%;}
+    .choice{border:1px solid rgba(255,255,255,0.4);padding:10px;border-radius:10px;text-align:center;cursor:pointer;}
+    .choice.active{background:rgba(255,255,255,0.2);}    
+    /* micro haptic visual feedback */
+    .pop{animation:pop .12s ease}
+    @keyframes pop{from{transform:scale(.95)}to{transform:scale(1)}}
+  </style>
+</head>
+<body>
+  <section id="game1" class="position-relative text-center">
+    <button class="btn btn-light btn-sm next-btn" onclick="document.getElementById('game2').scrollIntoView({behavior:'smooth'})">Next game →</button>
+    <h2>🧼 Clean the Mess</h2>
+    <p>Tap or swipe to wipe the jacket clean.</p>
+    <div style="position:relative;display:inline-block;">
+      <img id="jacketImg" src="https://icon2.cleanpng.com/20240406/lvs/transparent-jacket-green-jacket-hooded-jacket-dark-olive-green-dark-olive-green-jacket-with-transparent-hood6610f4651a6214.23911245.webp" alt="Jacket">
+      <canvas id="wipeCanvas" style="position:absolute;top:0;left:0;"></canvas>
+    </div>
+    <div class="mt-2">
+      <button id="submitWipe" class="btn btn-success btn-sm">Submit</button>
+      <p id="wipeResult"></p>
+    </div>
+
+
+<!-- Global Result Lightbox (Bootstrap Modal) -->
+<div class="modal fade" id="resultLightbox" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog modal-dialog-centered">
+<div class="modal-content" style="background:#111; color:#fff; border-radius:16px; border:1px solid rgba(255,255,255,.15)">
+<div class="modal-body text-center p-3 p-md-4">
+<div class="ratio ratio-1x1 mb-3" style="max-width:220px; margin:0 auto;">
+<video id="resultAnim" src="https://cdn-icons-mp4.flaticon.com/512/19016/19016331.mp4" autoplay loop muted playsinline preload="auto" style="border-radius:12px; object-fit:cover;"></video>
+</div>
+<h5 id="resultMsg" class="mb-3"></h5>
+<button type="button" class="btn btn-success w-100" data-bs-dismiss="modal">Got it</button>
+</div>
+</div>
+</div>
+</div>
+  </section>
+
+  <section id="game2" class="position-relative text-center">
+    <button class="btn btn-light btn-sm next-btn" onclick="document.getElementById('game3').scrollIntoView({behavior:'smooth'})">Next game →</button>
+    <h2>🍫 Snack it Before It Melts</h2>
+    <p>Tap the cookie as fast as you can!</p>
+    <div id="playfield" style="position:relative;height:300px;border:2px dashed white;border-radius:12px;margin:auto;overflow:hidden;"></div>
+    <div class="mt-2">
+      <button id="startGame2" class="btn btn-success btn-sm">Start</button>
+      <p id="cookieResult"></p>
+    </div>
+  </section>
+
+  <section id="game3" class="text-center">
+    <h2>Let's Find Your Favorite Flavor</h2>
+    <p class="mb-1">👕 Find Your Fit</p>
+    <p>Three quick choices to find your vibe.</p>
+    <h2>Is Your Style more...?</h2>
+    <div class="mb-3">
+      <div class="choice" onclick="selectChoice(this,'style','Minimal')">Minimal</div>
+      <div class="choice" onclick="selectChoice(this,'style','Maximal')">Over The Top</div>
+    </div>
+    <h2>Do you think you are more Calm or Bold?</h2>
+    <div class="mb-3">
+      <div class="choice" onclick="selectChoice(this,'pace','Calm')">Calm</div>
+      <div class="choice" onclick="selectChoice(this,'pace','Bold')">Bold</div>
+    </div>
+    <h2>Are You a Morning Person or Night?</h2>
+    <div class="mb-3">
+      <div class="choice" onclick="selectChoice(this,'time','Morning')">Morning</div>
+      <div class="choice" onclick="selectChoice(this,'time','Night')">Night</div>
+    </div>
+    <button id="fitSubmit" class="btn btn-success btn-sm">Reveal my flavor</button>
+    <p id="fitResult"></p>
+  </section>
+
+<!-- right before your <script> ... </script> block -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+
+const resultModal = new bootstrap.Modal(document.getElementById('resultLightbox'));
+const resultMsgEl = document.getElementById('resultMsg');
+const resultAnim = document.getElementById('resultAnim');
+
+function showResult(msg){
+  resultMsgEl.textContent = msg;
+  try { resultAnim.currentTime = 0; resultAnim.play().catch(()=>{}); } catch(_) {}
+  resultModal.show();
+}
+
+</script>
+<script>
+// ============== Game 1: Clean the Mess (add wipe sound) ==============
+const canvas=document.getElementById('wipeCanvas');
+const img=document.getElementById('jacketImg');
+const ctx=canvas.getContext('2d');
+// preload wipe sound
+const wipeAudioSrc='https://res.cloudinary.com/do7w7isgi/video/upload/v1761799628/window-wipe-106600_qq1hvd.mp3';
+const baseWipeAudio=new Audio(wipeAudioSrc); baseWipeAudio.preload='auto'; baseWipeAudio.volume=0.4;
+let lastWipeSound=0;
+function playWipeSound(){
+  const now=performance.now();
+  if(now-lastWipeSound>120){ // throttle so it doesn't spam
+    const a=baseWipeAudio.cloneNode();
+    a.volume=0.4;
+    a.play().catch(()=>{});
+    lastWipeSound=now;
+  }
+}
+function resize(){
+  canvas.width=img.clientWidth;canvas.height=img.clientHeight;
+  ctx.fillStyle='rgba(255,255,255,0.3)';ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+window.addEventListener('resize',resize);img.onload=resize;if (img.complete) resize();
+let down=false;
+canvas.addEventListener('mousedown',()=>{down=true});
+canvas.addEventListener('mouseup',()=>{down=false});
+canvas.addEventListener('mouseleave',()=>{down=false});
+canvas.addEventListener('mousemove',e=>{if(!down)return;ctx.clearRect(e.offsetX-15,e.offsetY-15,30,30);playWipeSound();});
+// touch
+canvas.addEventListener('touchstart',()=>{down=true},{passive:true});
+canvas.addEventListener('touchend',()=>{down=false},{passive:true});
+canvas.addEventListener('touchmove',e=>{if(!down)return;const rect=canvas.getBoundingClientRect();const t=e.touches[0];const x=t.clientX-rect.left;const y=t.clientY-rect.top;ctx.clearRect(x-18,y-18,36,36);playWipeSound();},{passive:true});
+
+document.getElementById('submitWipe').onclick=function(){
+  const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;let clear=0;
+  for(let i=3;i<data.length;i+=4){if(data[i]===0)clear++;}
+  const pct=Math.round(clear/(canvas.width*canvas.height)*100);
+  let msg='';
+  if(pct>=100)msg="Spotless! You’ve earned ₹150 off your next order.";
+  else if(pct>=50)msg="Good, could have shined better! You’ve earned ₹50 off your next order.";
+  else msg="Hmm, not good enough. Better luck next time.";
+  showResult(msg);
+};
+
+// ============== Game 2: Snack it Before It Melts (faster + haptics) ==============
+// ============== Game 2: Snack it Before It Melts (faster + haptics) ==============
+let caught = 0, timer;
+const play = document.getElementById('playfield');
+
+function spawnCookie() {
+  const img = document.createElement('img');
+  img.src = 'https://png.pngtree.com/png-vector/20250425/ourmid/pngtree-chocolate-chip-cookie-icon-white-background-png-image_16100260.png';
+  img.style.width = '60px';
+  img.style.position = 'absolute';
+  img.style.left = Math.random() * (play.clientWidth  - 60) + 'px';
+  img.style.top  = Math.random() * (play.clientHeight - 60) + 'px';
+
+  const hit = () => {
+    caught++;
+    img.classList.add('pop');
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch(_) {} }
+    img.remove();
+  };
+  img.addEventListener('pointerdown', hit, { once: true }); // faster on mobile
+  img.addEventListener('click', hit, { once: true });
+
+  play.appendChild(img);
+  // disappear quicker
+  setTimeout(() => img.remove(), 700);
+}
+
+function startGame2() {
+  // reset state
+  caught = 0;
+  document.getElementById('cookieResult').textContent = '';
+  // clear any lingering cookies
+  [...play.querySelectorAll('img')].forEach(n => n.remove());
+
+  // spawn faster
+  timer = setInterval(spawnCookie, 900);
+
+  // stop after 15s and then show result
+  setTimeout(() => {
+    clearInterval(timer);
+    // clean up any remaining cookies on field
+    [...play.querySelectorAll('img')].forEach(n => n.remove());
+    showResult(caught >= 5
+      ? "Sweet reflexes! Grab your free sample with your next order."
+      : "Almost there!");
+  }, 15000);
+}
+
+document.getElementById('startGame2').onclick = startGame2;
+
+
+// ============== Game 3: Find Your Fit (heading change already added) ==============
+const selections={};
+function selectChoice(el,group,val){
+  // clear within same group only
+  document.querySelectorAll('.choice').forEach(c=>{
+    if(c.getAttribute('onclick') && c.getAttribute('onclick').includes(`,'${group}',`)) c.classList.remove('active');
+  });
+  el.classList.add('active');
+  selections[group]=val;
+}
+
+document.getElementById('fitSubmit').onclick=function(){
+  let flavor='The Easy Drip';
+  if(selections.pace==='Bold'&&selections.time==='Morning')flavor='The Bold Classic';
+  else if(selections.time==='Night'&&selections.pace==='Bold')flavor='The Midnight Espresso';
+  showResult(`Your vibe: ${flavor}. You + ${flavor} = perfect fit. Here’s 15% off your first one.`);
+};
+
+
+
+</script>
+</body>
+</html>
