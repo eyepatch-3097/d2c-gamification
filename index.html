@@ -252,7 +252,7 @@
       // IMPORTANT: Do not call OpenAI directly from the browser with a secret key.
       // Instead, POST to your backend proxy which holds OPENAI_API_KEY server-side.
       // Example endpoint in Django/Render: /api/fashion-catalog
-      const resp = await fetch('/api/fashion-catalog',{
+      const resp = await fetch('https://hallowed-cackle-554q96wprvqcv7wp-8000.app.github.dev/api/fashion-catalog',{
         method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
       });
       if(!resp.ok) throw new Error('bad');
